@@ -29,14 +29,18 @@ const MAX_SUPPORTED_LOGS_NUMBER: usize = 5;
 #[derive(Clone)]
 pub struct ExecutionClient<R: ExecutionRpc> {
     pub rpc: R,
-    state: State,
+    state: State,//provides info for blockchain state information 
 }
 
 impl<R: ExecutionRpc> ExecutionClient<R> {
+    //creates a execution client 
     pub fn new(rpc: &str, state: State) -> Result<Self> {
         let rpc: R = ExecutionRpc::new(rpc)?;
         Ok(ExecutionClient { rpc, state })
     }
+    //checks if rpc is connected to correct network 
+    //asynchronous becuase it is network operation 
+    //i.e it involves sening request and waiting for response 
 
     pub async fn check_rpc(&self, chain_id: u64) -> Result<()> {
         if self.rpc.chain_id().await? != chain_id {
@@ -46,6 +50,7 @@ impl<R: ExecutionRpc> ExecutionClient<R> {
         }
     }
 
+    //
     pub async fn get_account(
         &self,
         address: &Address,
@@ -64,8 +69,8 @@ impl<R: ExecutionRpc> ExecutionClient<R> {
             .get_proof(address, slots, block.number.as_u64())
             .await?;
 
-        let account_path = keccak256(address.as_bytes()).to_vec();
-        let account_encoded = encode_account(&proof);
+        let account_path = keccak256(address.as_bytes()).to_vec();//accounts path in merkle tree is calculated by hashin gthe account address
+        let account_encoded = encode_account(&proof);//encodes the account proof so that it can be verified 
 
         let is_valid = verify_proof(
             &proof.account_proof,
@@ -102,12 +107,12 @@ impl<R: ExecutionRpc> ExecutionClient<R> {
             slot_map.insert(storage_proof.key, storage_proof.value);
         }
 
-        let code = if proof.code_hash == H256::from_slice(KECCAK_EMPTY.as_slice()) {
+        let code = if proof.code_hash == H256::from_slice(KECCAK_EMPTY.as_slice()) {//if proof code hash is empty then returns empty vector
             Vec::new()
         } else {
             let code = self.rpc.get_code(address, block.number.as_u64()).await?;
             let code_hash = keccak256(&code).into();
-
+            //gets the code hash and checks if it matches with the code hash in the proof
             if proof.code_hash != code_hash {
                 return Err(ExecutionError::CodeHashMismatch(
                     *address,
@@ -131,9 +136,10 @@ impl<R: ExecutionRpc> ExecutionClient<R> {
     }
 
     pub async fn send_raw_transaction(&self, bytes: &[u8]) -> Result<H256> {
-        self.rpc.send_raw_transaction(bytes).await
+        self.rpc.send_raw_transaction(bytes).await //delegate the send raw transaction to rpc
     }
 
+    //full_tx asks whthere to return full transaction or just the hash
     pub async fn get_block(&self, tag: BlockTag, full_tx: bool) -> Result<Block> {
         let mut block = self
             .state

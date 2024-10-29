@@ -8,6 +8,7 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::{fmt::Display, net::SocketAddr, str::FromStr, sync::Arc};
 use tracing::info;
 
+//builds rpc server
 use jsonrpsee::{
     core::{async_trait, server::Methods, Error},
     proc_macros::rpc,
@@ -20,12 +21,13 @@ use common::{
     types::{Block, BlockTag},
     utils::{hex_str_to_bytes, u64_to_hex_string},
 };
+
 use execution::types::CallOpts;
 
 pub struct Rpc<DB: Database> {
     node: Arc<Node<DB>>,
-    handle: Option<ServerHandle>,
-    address: SocketAddr,
+    handle: Option<ServerHandle>,//server handle for managin grpc server
+    address: SocketAddr,//adress where rpc willl listen 
 }
 
 impl<DB: Database> Rpc<DB> {
@@ -56,6 +58,7 @@ impl<DB: Database> Rpc<DB> {
     }
 }
 
+//various methods for interacting with ethereum like functionalities
 #[rpc(server, namespace = "eth")]
 trait EthRpc {
     #[method(name = "getBalance")]

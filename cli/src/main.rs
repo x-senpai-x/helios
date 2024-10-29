@@ -21,6 +21,7 @@ use consensus::database::FileDB;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    //env filter used to display log messages 
     let env_filter = EnvFilter::builder()
         .with_default_directive(LevelFilter::INFO.into())
         .from_env()
@@ -32,14 +33,18 @@ async fn main() -> Result<()> {
 
     tracing::subscriber::set_global_default(subscriber).expect("subscriber set failed");
 
-    let config = get_config();
+    let config = get_config();//returns config struct
+    //Cli struct is representation of how application is invoked from cli arguments
+
     let mut client = match ClientBuilder::new().config(config).build::<FileDB>() {
         Ok(client) => client,
         Err(err) => {
             error!(target: "helios::runner", error = %err);
             exit(1);
         }
-    };
+    };//builds the client 
+    //::new() sets client with default values then .config : config values applied to it 
+    //.build: uses fileDB as its database to store 
 
     if let Err(err) = client.start().await {
         error!(target: "helios::runner", error = %err);
@@ -83,13 +88,14 @@ fn register_shutdown_handler(client: Client<FileDB>) {
 }
 
 fn get_config() -> Config {
-    let cli = Cli::parse();
+    let cli = Cli::parse();//parses the CLI arguments in cli in the syntax given in Cli Struct 
 
     let config_path = home_dir().unwrap().join(".helios/helios.toml");
+    //home_dir() gives path to user's home directory and helios/helios.toml is joined 
 
     let cli_config = cli.as_cli_config();
-
-    Config::from_file(&config_path, &cli.network, &cli_config)
+    //Cli config struct is used internally by application  
+    Config::from_file(&config_path, &cli.network, &cli_config)//forms config struct using the
 }
 
 #[derive(Parser)]

@@ -61,13 +61,19 @@ impl ExecutionRpc for HttpRpc {
     }
 
     async fn create_access_list(&self, opts: &CallOpts, block: BlockTag) -> Result<AccessList> {
+        //opts is call opts struct containing from to value gas max fee etc 
+        //holds information for the transaction i.e call to be made to ethereum smart contract 
+
+        //basically creates a transaction request based on provided options and specified block tag
         let block = match block {
             BlockTag::Latest => BlockId::Number(BlockNumber::Latest),
             BlockTag::Finalized => BlockId::Number(BlockNumber::Finalized),
             BlockTag::Number(number) => BlockId::Number(BlockNumber::Number(number.into())),
         };
+        //block tag enum converted to block id enum for api calls
 
-        let mut raw_tx = Eip1559TransactionRequest::new();
+
+        let mut raw_tx = Eip1559TransactionRequest::new();//creates a new eip1559 transaction request (implements ether destruction)
         raw_tx.to = Some(opts.to.unwrap_or_default().into());
         raw_tx.from = opts.from;
         raw_tx.value = opts.value;
@@ -76,7 +82,7 @@ impl ExecutionRpc for HttpRpc {
         raw_tx.max_priority_fee_per_gas = Some(U256::zero());
         raw_tx.data = opts.data.as_ref().map(|data| data.to_owned());
 
-        let tx = TypedTransaction::Eip1559(raw_tx);
+        let tx = TypedTransaction::Eip1559(raw_tx);//creates a new typed transaction with eip1559 transaction request
         let list = self
             .provider
             .create_access_list(&tx, Some(block))

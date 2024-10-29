@@ -1,6 +1,6 @@
 use crate::base::BaseConfig;
 use crate::cli::CliConfig;
-use crate::types::ChainConfig;
+use crate::types::ChainConfig;//used for chain id genesis time 
 use crate::utils::bytes_opt_deserialize;
 use crate::Network;
 use common::config::types::Forks;
@@ -16,10 +16,12 @@ use std::str::FromStr;
 use std::{path::PathBuf, process::exit};
 
 #[derive(Deserialize, Debug, Default)]
+
 pub struct Config {
-    pub consensus_rpc: String,
-    pub execution_rpc: String,
-    pub rpc_bind_ip: Option<IpAddr>,
+    //RPC optional , fallback optional 
+    pub consensus_rpc: String, 
+    pub execution_rpc: String, 
+    pub rpc_bind_ip: Option<IpAddr>, 
     pub rpc_port: Option<u16>,
     #[serde(deserialize_with = "bytes_deserialize")]
     pub default_checkpoint: Vec<u8>,
@@ -38,9 +40,9 @@ pub struct Config {
 
 impl Config {
     pub fn from_file(config_path: &PathBuf, network: &str, cli_config: &CliConfig) -> Self {
-        let base_config = Network::from_str(network)
-            .map(|n| n.to_base_config())
-            .unwrap_or(BaseConfig::default());
+        let base_config = Network::from_str(network)//converts newwork string to Network enum holding all the network types
+            .map(|n| n.to_base_config())//transforms network enum to base config
+            .unwrap_or(BaseConfig::default());//if it fails then we take default values of BaseConfig struct 
 
         let base_provider = Serialized::from(base_config, network);
         let toml_provider = Toml::file(config_path).nested();
@@ -93,3 +95,4 @@ impl Config {
         }
     }
 }
+

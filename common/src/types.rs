@@ -30,27 +30,25 @@ pub struct Block {
 }
 
 #[derive(Deserialize, Debug, Clone)]
-pub enum Transactions {
+pub enum Transactions {//holds transaction hashes or full data of transactions
     Hashes(Vec<H256>),
-    Full(Vec<Transaction>),
+    Full(Vec<Transaction>),//vector that contains transaction elements
+    
 }
 
-impl Default for Transactions {
-    fn default() -> Self {
-        Self::Full(Vec::new())
-    }
-}
 
 impl Transactions {
     pub fn hashes(&self) -> Vec<H256> {
         match self {
             Self::Hashes(hashes) => hashes.clone(),
-            Self::Full(txs) => txs.iter().map(|tx| tx.hash).collect(),
+            Self::Full(txs) => txs.iter().map(|tx| tx.hash).collect(),//txs is a vector of transactions and we are mapping each transaction to its hash
+            //i.e if Transactions enum contains hashes then directly hash is returned else we are mapping each transaction to its hash
+            //so hashes fn returns a list of hashes 
         }
     }
 }
 
-impl Serialize for Transactions {
+impl Serialize for Transactions {//serializing transactions based on whether they contain hashes or full data
     fn serialize<S>(&self, s: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -77,9 +75,9 @@ impl Serialize for Transactions {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum BlockTag {
-    Latest,
-    Finalized,
+pub enum BlockTag {//different ways to refer to block 
+    Latest,//most recent block
+    Finalized,//last finalized block
     Number(u64),
 }
 

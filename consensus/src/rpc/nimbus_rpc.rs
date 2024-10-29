@@ -1,10 +1,10 @@
-use std::cmp;
+use std::cmp;//cmp min used to get the minimum of two values
 
 use async_trait::async_trait;
 use eyre::Result;
-use retri::{retry, BackoffSettings};
+use retri::{retry, BackoffSettings};//The retry function is used to retry a block of asynchronous code (like an HTTP request) multiple times with configurable backoff (delays between retries), which is useful in scenarios where transient failures might occur, such as network issues.
 use serde::de::DeserializeOwned;
-
+//eserializing data owned by a type
 use super::ConsensusRpc;
 use crate::constants::MAX_REQUEST_LIGHT_CLIENT_UPDATES;
 use common::errors::RpcError;
@@ -15,13 +15,14 @@ use consensus_core::types::{BeaconBlock, Bootstrap, FinalityUpdate, OptimisticUp
 pub struct NimbusRpc {
     rpc: String,
 }
-
+//fetch data from a URL and unmarshal the JSON response into a variable of any type specified by the caller.
 async fn get<R: DeserializeOwned>(req: &str) -> Result<R> {
     let bytes = retry(
         || async { Ok::<_, eyre::Report>(reqwest::get(req).await?.bytes().await?) },
-        BackoffSettings::default(),
+        BackoffSettkings::default(),
     )
     .await?;
+
 
     Ok(serde_json::from_slice::<R>(&bytes)?)
 }

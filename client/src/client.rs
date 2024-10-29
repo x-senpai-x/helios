@@ -1,9 +1,14 @@
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(target_arch = "wasm32"))]//Conditional Compilation
 use std::net::IpAddr;
+//compiled for all other architectures except WebAssembly.
+// WebAssembly does not have direct access to the network stack, meaning it can't bind to IP addresses or open network ports. 
+//This is a security feature, as it prevents WebAssembly modules from making arbitrary network requests.
+//IpAddr import from the std::net module will only be included if the code is not being compiled for WebAssembly. The rest (Arc, Duration) are imported regardless of the target.
+
 use std::sync::Arc;
 use std::time::Duration;
 
-use config::networks::Network;
+use config::networks::Network;//enum imported containing all the network types  MAINNET,GOERLI,SEPOLIA,HOLESKY,etc
 use consensus::database::Database;
 use ethers::prelude::{Address, U256};
 use ethers::types::{Filter, Log, SyncingStatus, Transaction, TransactionReceipt, H256};
@@ -24,7 +29,14 @@ use std::path::PathBuf;
 use crate::rpc::Rpc;
 
 #[derive(Default)]
+//The ClientBuilder struct is used to build a Client instance with the desired configuration.
+//rpc_bind_ip, rpc_port, and data_dir are only included if the target architecture is not WebAssembly.
+
+//consensus rpc is the interface that allows to interact with consensus layer 
+//consensus layer: Retrieving the finalized block or head block. Checking the status of validators. Subscribing to consensus-related events.
+
 pub struct ClientBuilder {
+    //Note all these are optional
     network: Option<Network>,
     consensus_rpc: Option<String>,
     execution_rpc: Option<String>,
@@ -42,9 +54,11 @@ pub struct ClientBuilder {
 }
 
 impl ClientBuilder {
+    //new instance of ClientBuilder created with default values
     pub fn new() -> Self {
         Self::default()
     }
+    //below functions are used to set the values of the ClientBuilder struct and return the struct instance
 
     pub fn network(mut self, network: Network) -> Self {
         self.network = Some(network);
@@ -61,6 +75,8 @@ impl ClientBuilder {
         self
     }
 
+// Ethereum client needs to work with binary data.
+
     pub fn checkpoint(mut self, checkpoint: &str) -> Self {
         let checkpoint = hex::decode(checkpoint.strip_prefix("0x").unwrap_or(checkpoint))
             .expect("cannot parse checkpoint");
@@ -76,6 +92,7 @@ impl ClientBuilder {
 
     #[cfg(not(target_arch = "wasm32"))]
     pub fn rpc_port(mut self, port: u16) -> Self {
+
         self.rpc_port = Some(port);
         self
     }
@@ -105,8 +122,12 @@ impl ClientBuilder {
         self.strict_checkpoint_age = true;
         self
     }
+    //creates client instance using configured values 
 
     pub fn build<DB: Database>(self) -> Result<Client<DB>> {
+        //if network is provided then it is converted to base config
+        //If no network is provided, the function tries to use the configuration provided through self.config
+
         let base_config = if let Some(network) = self.network {
             network.to_base_config()
         } else {
@@ -173,7 +194,8 @@ impl ClientBuilder {
         } else {
             None
         };
-
+        //provides alternate rpc if primary rpc fails
+        //client will try to connect to the fallback rpc if the primary rpc fails
         let fallback = if self.fallback.is_some() {
             self.fallback
         } else if let Some(config) = &self.config {
@@ -181,12 +203,15 @@ impl ClientBuilder {
         } else {
             None
         };
-
+        //if the client is unable to connect to the primary rpc, it will try to connect to the fallback rpc if the load_external_fallback flag is set to true
         let load_external_fallback = if let Some(config) = &self.config {
             self.load_external_fallback || config.load_external_fallback
         } else {
             self.load_external_fallback
         };
+        //if set to true then the client will only accept checkpoints that are less than the max_checkpoint_age
+
+        //if strict_checkpoint_age is defined in config then it will be used otherwise the value from the ClientBuilder will be used 
 
         let strict_checkpoint_age = if let Some(config) = &self.config {
             self.strict_checkpoint_age || config.strict_checkpoint_age
@@ -224,15 +249,16 @@ impl ClientBuilder {
     }
 }
 
+
 pub struct Client<DB: Database> {
-    node: Arc<Node<DB>>,
+    node: Arc<Node<DB>>,//allows safe sharing of node across different threads
     #[cfg(not(target_arch = "wasm32"))]
     rpc: Option<Rpc<DB>>,
 }
 
 impl<DB: Database> Client<DB> {
     fn new(config: Config) -> Result<Self> {
-        let config = Arc::new(config);
+        let config = Arc::new(config);//arc allows to share ownership of data between multiple threads
         let node = Node::new(config.clone())?;
         let node = Arc::new(node);
 
@@ -250,11 +276,11 @@ impl<DB: Database> Client<DB> {
             rpc,
         })
     }
-
+    //start the rpc server of the client
     pub async fn start(&mut self) -> Result<()> {
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(rpc) = &mut self.rpc {
-            rpc.start().await?;
+            rpc.start().await?;//fn paused  until the server is started
         }
 
         Ok(())
@@ -388,7 +414,7 @@ impl<DB: Database> Client<DB> {
     pub async fn get_coinbase(&self) -> Result<Address> {
         self.node.get_coinbase().await
     }
-
+//The function enters an infinite loop that will repeatedly check the node's synchronization status until it is fully synced.
     pub async fn wait_synced(&self) {
         loop {
             if let Ok(SyncingStatus::IsFalse) = self.syncing().await {

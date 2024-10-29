@@ -17,3 +17,4 @@ pub trait ConsensusRpc: Send + Sync {
     async fn get_block(&self, slot: u64) -> Result<BeaconBlock>;
     async fn chain_id(&self) -> Result<u64>;
 }
+    

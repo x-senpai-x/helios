@@ -80,6 +80,8 @@ pub struct CheckpointFallback {
 }
 
 async fn get(req: &str) -> Result<reqwest::Response> {
+    //performs http get request 
+    //fetches checkpoint data 
     retry(
         || async { Ok::<_, eyre::Report>(reqwest::get(req).await?) },
         BackoffSettings::default(),

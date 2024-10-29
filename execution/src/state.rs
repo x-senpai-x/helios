@@ -12,13 +12,15 @@ use tokio::{
 
 #[derive(Clone)]
 pub struct State {
-    inner: Arc<RwLock<Inner>>,
+    inner: Arc<RwLock<Inner>>,//read write lock 
 }
+//Multiple tasks or threads might need to read the state simultaneously (e.g., querying blocks or transactions).
+// A read-write lock allows multiple readers to access the shared data concurrently, as long as no writers are active. 
 
 impl State {
     pub fn new(
-        mut block_recv: Receiver<Block>,
-        mut finalized_block_recv: watch::Receiver<Option<Block>>,
+        mut block_recv: Receiver<Block>, //recieves new blocks
+        mut finalized_block_recv: watch::Receiver<Option<Block>>, //watch changes in finalized blocks 
         history_length: u64,
     ) -> Self {
         let inner = Arc::new(RwLock::new(Inner::new(history_length)));
@@ -27,18 +29,18 @@ impl State {
         #[cfg(not(target_arch = "wasm32"))]
         let run = tokio::spawn;
         #[cfg(target_arch = "wasm32")]
-        let run = wasm_bindgen_futures::spawn_local;
+        let run = wasm_bindgen_futures::spawn_local; //spawns task in wasm format for web assembly
 
         run(async move {
             loop {
-                select! {
-                    block = block_recv.recv() => {
+                select! { //'select! ' await multiple asynchronous operations simultaneously and execute code based on which operation completes first.
+                    block = block_recv.recv() => { //waits for new block to arrive 
                         if let Some(block) = block {
-                            inner_ref.write().await.push_block(block);
+                            inner_ref.write().await.push_block(block);//pushes the block to the inner state and the state is updated
                         }
                     },
                     _ = finalized_block_recv.changed() => {
-                        let block = finalized_block_recv.borrow_and_update().clone();
+                        let block = finalized_block_recv.borrow_and_update().clone();//waits for some change in finalized blcok and updates the state
                         if let Some(block) = block {
                             inner_ref.write().await.push_finalized_block(block);
                         }
@@ -52,20 +54,22 @@ impl State {
     }
 
     pub async fn push_block(&self, block: Block) {
-        self.inner.write().await.push_block(block);
+        self.inner.write().await.push_block(block);//acquires write lock and pushes the block to the inner state
     }
 
     // full block fetch
 
     pub async fn get_block(&self, tag: BlockTag) -> Option<Block> {
+        //BlockTag is enum coneaining latest , finalized,specific  number 
         match tag {
-            BlockTag::Latest => self
+
+            BlockTag::Latest => self //if latest block is requested then the last block is returned
                 .inner
-                .read()
-                .await
+                .read()//acquires read lock
+                .await //waits unitl lock is obtained until then control is returned to executor
                 .blocks
-                .last_key_value()
-                .map(|entry| entry.1)
+                .last_key_value()//last key value pair is returned from blocks map 
+                .map(|entry| entry.1)//extracts the block from the key value pair 
                 .cloned(),
             BlockTag::Finalized => self.inner.read().await.finalized_block.clone(),
             BlockTag::Number(number) => self.inner.read().await.blocks.get(&number).cloned(),
@@ -77,22 +81,22 @@ impl State {
         inner
             .hashes
             .get(&hash)
-            .and_then(|number| inner.blocks.get(number))
+            .and_then(|number| inner.blocks.get(number))//fetch block from the blocks map for the given nnmber
             .cloned()
     }
 
     // transaction fetch
 
-    pub async fn get_transaction(&self, hash: H256) -> Option<Transaction> {
+    pub async fn get_transaction(&self, hash: H256) -> Option<Transaction> {//hash is transaction hash 
         let inner = self.inner.read().await;
         inner
             .txs
-            .get(&hash)
-            .and_then(|loc| {
+            .get(&hash)//gets txn location from the txs map
+            .and_then(|loc| {//if location is found then fetch the block and the transaction from the block
                 inner
                     .blocks
-                    .get(&loc.block)
-                    .and_then(|block| match &block.transactions {
+                    .get(&loc.block)//gets block from transaction lock 
+                    .and_then(|block| match &block.transactions {//gets transaction from the block
                         Transactions::Full(txs) => txs.get(loc.index),
                         Transactions::Hashes(_) => unreachable!(),
                     })
@@ -100,7 +104,7 @@ impl State {
             .cloned()
     }
 
-    pub async fn get_transaction_by_block_and_index(
+    pub async fn get_transaction_by_block_and_index(//we have blcok hash and index of the transaction in the block
         &self,
         block_hash: H256,
         index: u64,
@@ -108,11 +112,11 @@ impl State {
         let inner = self.inner.read().await;
         inner
             .hashes
-            .get(&block_hash)
-            .and_then(|number| inner.blocks.get(number))
-            .and_then(|block| match &block.transactions {
-                Transactions::Full(txs) => txs.get(index as usize),
-                Transactions::Hashes(_) => unreachable!(),
+            .get(&block_hash)//hashes is mapping of block hash to block number
+            .and_then(|number| inner.blocks.get(number))//blocks is mapping of block number to block
+            .and_then(|block| match &block.transactions {//checks the transaction field of block 
+                Transactions::Full(txs) => txs.get(index as usize),//if block contains full transactions then fetch the transaction from the index
+                Transactions::Hashes(_) => unreachable!(),//if block contains only hashes then it is unreachable
             })
             .cloned()
     }
@@ -134,7 +138,7 @@ impl State {
     }
 
     pub async fn get_coinbase(&self, tag: BlockTag) -> Option<Address> {
-        self.get_block(tag).await.map(|block| block.miner)
+        self.get_block(tag).await.map(|block| block.miner) //address of miner that used to recieve the block reward
     }
 
     // misc
@@ -168,7 +172,8 @@ impl Inner {
     }
 
     pub fn push_block(&mut self, block: Block) {
-        self.hashes.insert(block.hash, block.number.as_u64());
+        self.hashes.insert(block.hash, block.number.as_u64()); //append block hash and block number in the hash map 
+        //maps each transaction hash to its location within the block 
         block
             .transactions
             .hashes()
@@ -181,25 +186,30 @@ impl Inner {
                 };
                 self.txs.insert(*tx, location);
             });
+           //TransactionLocation is struct that contains the block number and the index of the transaction within the block
+            //all txs in the pushed block are added to txs hash map in inner struct mapping Hash to TransactionLocation  
 
         self.blocks.insert(block.number.as_u64(), block);
 
+        //Ensures that the number of blocks stored does not exceed the specified history_length.
+        //if new block added then the oldest blcok removed from the blocks
         while self.blocks.len() as u64 > self.history_length {
             if let Some((number, _)) = self.blocks.first_key_value() {
                 self.remove_block(*number);
             }
         }
     }
-
+//since finalized block is pushed it means that block is already in the blocks map we only need to add the updated block 
+//since on updating the block the block hash would change we need to remove the old block and add the updated block
     pub fn push_finalized_block(&mut self, block: Block) {
-        self.finalized_block = Some(block.clone());
+        self.finalized_block = Some(block.clone());//clones the block and adds it to the finalized block
 
         if let Some(old_block) = self.blocks.get(&block.number.as_u64()) {
-            if old_block.hash != block.hash {
+            if old_block.hash != block.hash {//block is already there with different hash 
                 self.remove_block(old_block.number.as_u64());
                 self.push_block(block)
             }
-        } else {
+        } else {//if not present then add the block
             self.push_block(block);
         }
     }
@@ -207,6 +217,7 @@ impl Inner {
     fn remove_block(&mut self, number: u64) {
         if let Some(block) = self.blocks.remove(&number) {
             self.hashes.remove(&block.hash);
+            //remove each transaction hash from the txs hash map
             block.transactions.hashes().iter().for_each(|tx| {
                 self.txs.remove(tx);
             });

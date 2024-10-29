@@ -27,6 +27,7 @@ pub struct BaseConfig {
 }
 
 impl Default for BaseConfig {
+    //default values if nothing set 
     fn default() -> Self {
         BaseConfig {
             rpc_bind_ip: IpAddr::V4(Ipv4Addr::LOCALHOST), // Default to "127.0.0.1"

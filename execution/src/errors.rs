@@ -38,7 +38,7 @@ pub enum ExecutionError {
     InvalidBlockRange(u64, u64),
 }
 
-/// Errors that can occur during evm.rs calls
+/// Errors that can occur during evm.rs calls   
 #[derive(Debug, Error)]
 pub enum EvmError {
     #[error("execution reverted: {0:?}")]

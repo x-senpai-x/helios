@@ -22,13 +22,15 @@ use execution::ExecutionClient;
 use crate::errors::NodeError;
 
 pub struct Node<DB: Database> {
-    pub consensus: ConsensusClient<NimbusRpc, DB>,
+    pub consensus: ConsensusClient<NimbusRpc, DB>,//The NimbusRpc struct provides a concrete implementation of the ConsensusRpc trait, enabling interaction with an Ethereum 2.0 Beacon node via its HTTP API
     pub execution: Arc<ExecutionClient<HttpRpc>>,
     pub config: Arc<Config>,
-    pub history_size: usize,
+    pub history_size: usize,//represents size of history to maintain
 }
 
 impl<DB: Database> Node<DB> {
+
+    //initializes consensus and execution clients for consensus and execution layer interaction respectively
     pub fn new(config: Arc<Config>) -> Result<Self, NodeError> {
         let consensus_rpc = &config.consensus_rpc;
         let execution_rpc = &config.execution_rpc;
@@ -52,15 +54,26 @@ impl<DB: Database> Node<DB> {
             history_size: 64,
         })
     }
+    //calls the evm 
 
     pub async fn call(&self, opts: &CallOpts, block: BlockTag) -> Result<Vec<u8>, NodeError> {
-        self.check_blocktag_age(&block).await?;
+        self.check_blocktag_age(&block).await?;//checks the age of specific block
+        //the block specified in recent enough 
 
         let mut evm = Evm::new(self.execution.clone(), self.chain_id(), block);
 
         evm.call(opts).await.map_err(NodeError::ExecutionEvmError)
     }
+    //estimates the gas for the transaction , checks age of latest block 
+    //If the difference between the current time and the block timestamp is greater than 60 seconds, it considers the node out of sync and returns an error. Otherwise, it considers the node in sync and returns Ok(())
+    
+    /*Gas Estimation (estimate_gas):
 
+Gas estimation does not require a specific block state for accuracy because it is a projection of how much gas a transaction will use if it were to be executed. It is typically based on the current state of the blockchain (e.g., the latest block
+
+
+Functions like call, get_balance, get_code, and others involve querying specific details about the state of the blockchain, such as the balance of an address, the code stored at a contract address, or the contents of a storage slot.
+ These functions require a specific block tag to ensure they are querying the correct state. The blockchain state changes over time as new blocks are added, so querying details like account balance, contract code, or storage at a particular block requires specifying which block’s state you are interested in. */
     pub async fn estimate_gas(&self, opts: &CallOpts) -> Result<u64, NodeError> {
         self.check_head_age().await?;
 
@@ -98,7 +111,7 @@ impl<DB: Database> Node<DB> {
 
         Ok(transaction_count as u64)
     }
-
+    //retrieves the bytecode of the contract at the specified address
     pub async fn get_code(&self, address: &Address, tag: BlockTag) -> Result<Vec<u8>> {
         self.check_blocktag_age(&tag).await?;
 
@@ -219,6 +232,7 @@ impl<DB: Database> Node<DB> {
     pub fn chain_id(&self) -> u64 {
         self.config.chain.chain_id
     }
+    //provides the syncing status
 
     pub async fn syncing(&self) -> Result<SyncingStatus> {
         if self.check_head_age().await.is_ok() {
@@ -251,7 +265,8 @@ impl<DB: Database> Node<DB> {
             })))
         }
     }
-
+    //provides the coinbase address allows the Ethereum network to direct transaction fees to a specific address when a transaction is processed.
+    //This approach enables each validator to have its own fee recipient address, as opposed to being constrained by a single address set on the execution side.
     pub async fn get_coinbase(&self) -> Result<Address> {
         self.check_head_age().await?;
 
@@ -259,6 +274,7 @@ impl<DB: Database> Node<DB> {
         Ok(block.miner)
     }
 
+    //checks the extent of sync of the node    
     async fn check_head_age(&self) -> Result<(), NodeError> {
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)

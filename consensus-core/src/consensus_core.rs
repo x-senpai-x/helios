@@ -9,15 +9,16 @@ use crate::utils::{
 };
 use common::config::types::Forks;
 use eyre::Result;
-use milagro_bls::PublicKey;
+use milagro_bls::PublicKey;//used in bls signature
 use ssz_rs::prelude::*;
 use std::cmp;
 use tracing::info;
 use zduny_wasm_timer::{SystemTime, UNIX_EPOCH};
 
+//obtain publiv key vector from sync committee
 pub fn get_participating_keys(
     committee: &SyncCommittee,
-    bitfield: &Bitvector<512>,
+    bitfield: &Bitvector<512>,//gives which member has aparticipated in the sync committee
 ) -> Result<Vec<PublicKey>> {
     let mut pks: Vec<PublicKey> = Vec::new();
 
@@ -25,7 +26,7 @@ pub fn get_participating_keys(
         if bit == true {
             let pk = &committee.pubkeys[i];
             let pk = PublicKey::from_bytes_unchecked(pk).unwrap();
-            pks.push(pk);
+            pks.push(pk);//stores public key of the member who has participated in the sync committee
         }
     });
 
@@ -41,14 +42,14 @@ pub fn get_bits(bitfield: &Bitvector<512>) -> u64 {
     });
 
     count
-}
+}//couts the no of validators who have participated in the sync committee
 
 pub fn is_finality_proof_valid(
     attested_header: &Header,
     finality_header: &mut Header,
     finality_branch: &[Bytes32],
 ) -> bool {
-    is_proof_valid(attested_header, finality_header, finality_branch, 6, 41)
+    is_proof_valid(attested_ header, finality_header, finality_branch, 6, 41)//depth and index 
 }
 
 pub fn is_next_committee_proof_valid(
@@ -93,22 +94,25 @@ pub fn has_sync_update(update: &GenericUpdate) -> bool {
 pub fn has_finality_update(update: &GenericUpdate) -> bool {
     update.finalized_header.is_some() && update.finality_branch.is_some()
 }
+//In practice, this means that for a decision or update to be considered safe or valid, half of the highest observed participation level)
+// would need to be in agreement or involved. 
 
 // implements state changes from apply_light_client_update and process_light_client_update in
 // the specification
 /// Returns the new checkpoint if one is created, otherwise None
+
 pub fn apply_generic_update(
     store: &mut LightClientStore,
     update: &GenericUpdate,
 ) -> Option<Vec<u8>> {
-    let committee_bits = get_bits(&update.sync_aggregate.sync_committee_bits);
+    let committee_bits = get_bits(&update.sync_aggregate.sync_committee_bits);//retrieves number of validators who have participated in the sync committee
 
     store.current_max_active_participants =
-        u64::max(store.current_max_active_participants, committee_bits);
+        u64::max(store.current_max_active_participants, committee_bits);// higher value between the existing value and the new committee bits.
 
     let should_update_optimistic = committee_bits > safety_threshold(store)
         && update.attested_header.slot > store.optimistic_header.slot;
-
+    
     if should_update_optimistic {
         store.optimistic_header = update.attested_header.clone();
     }
@@ -343,6 +347,7 @@ pub fn verify_sync_committee_signture(
 }
 
 pub fn compute_committee_sign_root(header: Bytes32, fork_data_root: Node) -> Result<Node> {
+    //fork data root holds information related to current fork version 
     let domain_type = &hex::decode("07000000")?[..];
     let domain = compute_domain(domain_type, fork_data_root)?;
     compute_signing_root(header, domain)
@@ -350,7 +355,7 @@ pub fn compute_committee_sign_root(header: Bytes32, fork_data_root: Node) -> Res
 
 pub fn calculate_fork_version(forks: &Forks, slot: u64) -> Vec<u8> {
     let epoch = slot / 32;
-
+//determines the fork version to use based on the current slot
     if epoch >= forks.deneb.epoch {
         forks.deneb.fork_version.clone()
     } else if epoch >= forks.capella.epoch {

@@ -18,6 +18,7 @@ pub fn is_aggregate_valid(sig_bytes: &SignatureBytes, msg: &[u8], pks: &[&Public
     }
 }
 
+//checks whether a specific leaf (data) is part of a larger Merkle tree that is represented by a known root hash
 pub fn is_proof_valid<L: Merkleized>(
     attested_header: &Header,
     leaf_object: &mut L,
